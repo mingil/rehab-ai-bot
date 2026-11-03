@@ -22,6 +22,12 @@ class LocalDB:
         cleaned = re.sub(r'^https?://(dx\.)?doi\.org/', '', str(doi).strip().lower())
         return cleaned.strip()
 
+    @staticmethod
+    def normalize_title(title):
+        if not title:
+            return ""
+        return re.sub(r'\s+', ' ', str(title).strip().lower()).rstrip('.')
+
     def _get_conn(self):
         # 🛡️ 시놀로지 디스크 I/O 지연 대비 Lock 방어 (20초 대기)
         conn = sqlite3.connect(self.db_path, timeout=20.0)
@@ -59,14 +65,19 @@ class LocalDB:
             with self._get_conn() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT id FROM processed_papers WHERE id IS NOT NULL AND id != ''")
-                return set(str(row[0]).strip() for row in cursor.fetchall())
+                return set(
+                    str(row[0]).strip()
+                    for row in cursor.fetchall()
+                    if str(row[0]).strip().isdigit()
+                )
         except Exception:
             return set()
 
-    def is_processed(self, pmid, doi=""):
+    def is_processed(self, pmid, doi="", title=""):
         try:
             clean_pmid = str(pmid).strip() if pmid else ""
             clean_doi = self.normalize_doi(doi)
+            clean_title = self.normalize_title(title)
             with self._get_conn() as conn:
                 cursor = conn.cursor()
                 if clean_pmid:
@@ -80,6 +91,11 @@ class LocalDB:
                     )
                     if cursor.fetchone():
                         return True
+                if clean_title:
+                    cursor.execute("SELECT title FROM processed_papers WHERE title IS NOT NULL AND title != ''")
+                    for (existing_title,) in cursor.fetchall():
+                        if self.normalize_title(existing_title) == clean_title:
+                            return True
             return False
         except Exception:
             return False
@@ -91,6 +107,12 @@ class LocalDB:
             clean_title = str(title).strip()
             with self._get_conn() as conn:
                 cursor = conn.cursor()
+                # 만약 Zotero에서 복원된 임시 ID(doi:..., zotero:...)가 이미 있으면 정식 PMID로 업데이트
+                if clean_doi and clean_pmid.isdigit():
+                    cursor.execute(
+                        "UPDATE processed_papers SET id = ? WHERE LOWER(doi) = ? AND id NOT GLOB '[0-9]*'",
+                        (clean_pmid, clean_doi),
+                    )
                 cursor.execute(
                     "INSERT OR IGNORE INTO processed_papers (id, doi, title) VALUES (?, ?, ?)",
                     (clean_pmid, clean_doi, clean_title)
@@ -98,3 +120,28 @@ class LocalDB:
                 conn.commit()
         except Exception as e:
             logger.warning(f"⚠️ DB 저장 중 오류 (PMID: {pmid}): {e}")
+
+    def sync_from_zotero(self, zotero_items):
+        """로컬 DB가 비어있을 때 Zotero 컬렉션의 기존 논문 목록을 로컬 DB에 일괄 복원"""
+        if not zotero_items:
+            return 0
+        inserted = 0
+        try:
+            with self._get_conn() as conn:
+                cursor = conn.cursor()
+                for item in zotero_items:
+                    rec_id = str(item.get("id", "")).strip()
+                    doi = self.normalize_doi(item.get("doi", ""))
+                    title = str(item.get("title", "")).strip()
+                    if not rec_id:
+                        continue
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO processed_papers (id, doi, title) VALUES (?, ?, ?)",
+                        (rec_id, doi, title),
+                    )
+                    if cursor.rowcount > 0:
+                        inserted += 1
+                conn.commit()
+        except Exception as e:
+            logger.warning(f"⚠️ Zotero 기반 DB 복원 중 오류: {e}")
+        return inserted

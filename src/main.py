@@ -95,8 +95,19 @@ def run_ai_pipeline(days_override=None, limit=None, dry_run=False):
 
         db = LocalDB()
         fetcher = PubMedFetcher()
+        zotero_mgr = ZoteroManager()
 
         db_count = db.get_count()
+        auto_sync_zotero = os.environ.get("ZOTERO_AUTO_SYNC_DB", "true").strip().lower() not in ("0", "false", "no")
+        if db_count == 0 and zotero_mgr.zot and auto_sync_zotero:
+            existing_zot_items = zotero_mgr.fetch_existing_items()
+            if existing_zot_items:
+                restored = db.sync_from_zotero(existing_zot_items)
+                db_count = db.get_count()
+                logger.info(
+                    f"🔄 [Zotero 자동 복원] 로컬 DB가 비어있어 Zotero 컬렉션에서 기존 논문 {restored}건을 자동 동기화했습니다!"
+                )
+
         if days_override is not None:
             days_to_fetch = int(days_override)
             logger.info(f"🔧 수동 스캔 범위 지정: 최근 {days_to_fetch}일치 스캔")
@@ -113,13 +124,16 @@ def run_ai_pipeline(days_override=None, limit=None, dry_run=False):
         # [STEP 1] PubMed 검색
         papers = fetcher.fetch_ai_papers(journals, keywords, days_to_fetch, existing_pmids)
 
-        # [STEP 2] DOI 기반 2차 필터링
+        # [STEP 2] DOI 및 제목 기반 2차 필터링
         new_papers = []
         for p in papers:
             pmid = str(p.get("id", "")).strip()
             doi = LocalDB.normalize_doi(p.get("doi", ""))
+            title = str(p.get("title", "")).strip()
 
-            if db.is_processed(pmid, doi):
+            if db.is_processed(pmid, doi, title):
+                # Zotero에서 복원된 행에 PMID가 비어있었다면 정식 PMID로 업데이트
+                db.mark_as_processed(pmid, doi, title)
                 continue
             new_papers.append(p)
 
@@ -138,7 +152,6 @@ def run_ai_pipeline(days_override=None, limit=None, dry_run=False):
 
         analyzer = PaperAnalyzer()
         notifier = Notifier()
-        zotero_mgr = ZoteroManager()
 
         logger.info(f"📊 최종 분석 및 Zotero 업로드 대상: {len(new_papers)}건 진행 시작")
 

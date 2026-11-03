@@ -2,6 +2,14 @@
 
 All notable changes to **Rehab AI Bot** are documented in this file.
 
+## [2.0.1] - 2026-11-03
+
+### Fixed
+- **Zotero `whenever.ZonedDateTime.py_datetime` Compatibility Fix (`requirements.txt`, `src/zotero_mgr.py`):** Upgraded `pyzotero` to `1.16.0` (with pinned `whenever==0.11.0`) and added a bidirectional `_ZonedDateTimeCompat` shim so both `.py_datetime()` and `.to_stdlib()` calls succeed across all `pyzotero`/`whenever` versions.
+- **Zotero Collection Deduplication & Empty Local DB Auto-Restore (`src/zotero_mgr.py`, `src/local_db.py`, `src/main.py`):** When starting a fresh container with an empty `papers.db`, the bot now automatically checks the target Zotero collection first, restores existing papers into `papers.db`, and skips duplicate uploads to Zotero.
+
+---
+
 ## [2.0.0] - 2026-11-03
 
 ### Added

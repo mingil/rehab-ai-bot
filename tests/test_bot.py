@@ -121,6 +121,68 @@ class TestRehabAIBot(unittest.TestCase):
             self.assertIsNone(zm.zot)
             self.assertFalse(zm.add_paper({"title": "Sample"}))
 
+    def test_pyzotero_whenever_compat_proxy(self):
+        import datetime
+        import pyzotero._client as _zc
+
+        zdt = _zc.whenever.ZonedDateTime.now("Europe/London")
+        dt_legacy = zdt.py_datetime()
+        dt_modern = zdt.to_stdlib()
+        self.assertIsInstance(dt_legacy, datetime.datetime)
+        self.assertIsInstance(dt_modern, datetime.datetime)
+
+    def test_zotero_deduplication_and_db_auto_restore(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_restore.db")
+            db = LocalDB(db_path=db_path)
+
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "ZOTERO_USER_ID": "123456",
+                    "ZOTERO_API_KEY": "valid_key",
+                    "ZOTERO_CANDIDATES_ID": "COL123",
+                },
+            ), mock.patch("zotero_mgr.zotero.Zotero") as mock_zot_cls:
+                mock_zot = mock.MagicMock()
+                mock_zot_cls.return_value = mock_zot
+                mock_zot.everything.return_value = [
+                    {
+                        "data": {
+                            "key": "ITEM1",
+                            "itemType": "journalArticle",
+                            "DOI": "https://doi.org/10.5535/arm.260007",
+                            "title": "Digital Health Approaches to Geriatric Rehabilitation.",
+                            "extra": "",
+                        }
+                    }
+                ]
+
+                zm = ZoteroManager()
+                existing_items = zm.fetch_existing_items()
+                self.assertEqual(len(existing_items), 1)
+
+                # Restore to empty local DB
+                restored_count = db.sync_from_zotero(existing_items)
+                self.assertEqual(restored_count, 1)
+                self.assertEqual(db.get_count(), 1)
+                self.assertTrue(db.is_processed("42703846", "10.5535/arm.260007", ""))
+
+                # Upgrade temporary ID to real PMID when encountered
+                db.mark_as_processed("42703846", "10.5535/arm.260007", "Digital Health Approaches to Geriatric Rehabilitation.")
+                self.assertIn("42703846", db.get_all_pmids())
+
+                # Ensure duplicate upload to Zotero is skipped without calling create_items
+                res = zm.add_paper(
+                    {
+                        "id": "42703846",
+                        "doi": "10.5535/arm.260007",
+                        "title": "Digital Health Approaches to Geriatric Rehabilitation.",
+                    }
+                )
+                self.assertTrue(res)
+                mock_zot.create_items.assert_not_called()
+
     def test_notifier_markdown_archiving_and_telegram_truncation(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch.dict(
