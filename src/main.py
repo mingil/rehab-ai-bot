@@ -99,14 +99,15 @@ def run_ai_pipeline(days_override=None, limit=None, dry_run=False):
 
         db_count = db.get_count()
         auto_sync_zotero = os.environ.get("ZOTERO_AUTO_SYNC_DB", "true").strip().lower() not in ("0", "false", "no")
-        if db_count == 0 and zotero_mgr.zot and auto_sync_zotero:
+        if zotero_mgr.zot and auto_sync_zotero:
             existing_zot_items = zotero_mgr.fetch_existing_items()
             if existing_zot_items:
                 restored = db.sync_from_zotero(existing_zot_items)
-                db_count = db.get_count()
-                logger.info(
-                    f"🔄 [Zotero 자동 복원] 로컬 DB가 비어있어 Zotero 컬렉션에서 기존 논문 {restored}건을 자동 동기화했습니다!"
-                )
+                if restored > 0:
+                    db_count = db.get_count()
+                    logger.info(
+                        f"🔄 [Zotero 자동 복원] Zotero 컬렉션에서 누락된 기존 논문 {restored}건을 로컬 DB에 동기화했습니다! (총 {db_count}건)"
+                    )
 
         if days_override is not None:
             days_to_fetch = int(days_override)

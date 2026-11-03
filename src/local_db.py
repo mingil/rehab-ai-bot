@@ -122,26 +122,29 @@ class LocalDB:
             logger.warning(f"⚠️ DB 저장 중 오류 (PMID: {pmid}): {e}")
 
     def sync_from_zotero(self, zotero_items):
-        """로컬 DB가 비어있을 때 Zotero 컬렉션의 기존 논문 목록을 로컬 DB에 일괄 복원"""
+        """Zotero 컬렉션의 기존 논문 중 로컬 DB에 누락된 논문을 일괄 복원"""
         if not zotero_items:
             return 0
         inserted = 0
         try:
-            with self._get_conn() as conn:
-                cursor = conn.cursor()
-                for item in zotero_items:
-                    rec_id = str(item.get("id", "")).strip()
-                    doi = self.normalize_doi(item.get("doi", ""))
-                    title = str(item.get("title", "")).strip()
-                    if not rec_id:
-                        continue
+            for item in zotero_items:
+                rec_id = str(item.get("id", "")).strip()
+                pmid = str(item.get("pmid", "")).strip()
+                doi = self.normalize_doi(item.get("doi", ""))
+                title = str(item.get("title", "")).strip()
+                if not rec_id:
+                    continue
+                if self.is_processed(pmid, doi, title):
+                    continue
+                with self._get_conn() as conn:
+                    cursor = conn.cursor()
                     cursor.execute(
                         "INSERT OR IGNORE INTO processed_papers (id, doi, title) VALUES (?, ?, ?)",
                         (rec_id, doi, title),
                     )
                     if cursor.rowcount > 0:
                         inserted += 1
-                conn.commit()
+                    conn.commit()
         except Exception as e:
             logger.warning(f"⚠️ Zotero 기반 DB 복원 중 오류: {e}")
         return inserted
