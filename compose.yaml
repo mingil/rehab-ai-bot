@@ -1,0 +1,26 @@
+services:
+  rehab-ai-bot:
+    build: .
+    image: kimmingil/rehab-ai-bot:latest
+    container_name: pmr-ai-paper-bot
+    restart: on-failure:5  # 🚀 (원장님 세팅 유지)
+    init: true
+    user: "1026:100"
+    deploy:
+      resources:
+        limits:
+          memory: 512M    # 🛡️ 시놀로지 메모리 100% 점유 방지 (512MB 제한)
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Seoul
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ./data:/app/data         # 로컬 SQLite DB 및 마크다운 리포트 저장소
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

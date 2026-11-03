@@ -1,0 +1,26 @@
+# Sensitive environment variables
+.env
+.env.*
+!.env.example
+
+# Runtime data & logs (persisted on host NAS)
+data/
+logs/
+*.db
+*.db-shm
+*.db-wal
+*.db_old
+*.log
+
+# Python cache & testing
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+
+# Synology / OS metadata
+@eaDir/
+.DS_Store
+Thumbs.db
+auto_push_github.py

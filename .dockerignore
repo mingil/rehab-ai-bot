@@ -1,0 +1,17 @@
+.git
+.github
+.gitignore
+.env
+.env.*
+!.env.example
+data/
+logs/
+tests/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+@eaDir/
+.DS_Store
+README.md
+CHANGELOG.md
+auto_push_github.py

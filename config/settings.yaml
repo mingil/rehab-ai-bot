@@ -1,0 +1,10 @@
+# 🏥 대상 저널 (재활의학 핵심 저널)
+target_journals:
+  - "Archives of physical medicine and rehabilitation"
+  - "Annals of rehabilitation medicine"
+
+# 🧠 수집할 AI/ML 핵심 키워드 (리뷰 논문 포함 모든 연구 대상)
+target_keywords:
+  - "Artificial Intelligence"
+  - "Machine Learning"
+  - "Deep Learning"

@@ -1,0 +1,7 @@
+schedule==1.2.2
+PyYAML==6.0.3
+requests==2.33.1
+python-dotenv==1.2.2
+biopython==1.87
+google-genai==1.70.0
+pyzotero==1.11.1
