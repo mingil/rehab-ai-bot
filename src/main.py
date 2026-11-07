@@ -167,9 +167,11 @@ def run_ai_pipeline(days_override=None, limit=None, dry_run=False):
                     continue
 
                 if zotero_mgr.zot:
-                    zotero_mgr.add_paper(paper)
+                    if not zotero_mgr.add_paper(paper):
+                        logger.warning(f"⚠️ Zotero 업로드 실패 또는 건너뜀 (PMID: {paper.get('id')}) — 분석·발송은 계속 진행")
 
-                db.mark_as_processed(paper.get('id', ''), paper.get('doi', ''), paper.get('title', ''))
+                # 처리 완료 기록은 STEP 4에서 리포트 저장·발송이 끝난 뒤에 한다.
+                # (예전에는 여기서 먼저 기록해, 발송 전에 재시작되면 그 논문들이 영구히 누락됨 — 2026-11-03 22건 사례)
                 analysis_results.append({"paper": paper, "analysis": analysis_text})
 
                 time.sleep(5)
@@ -185,6 +187,11 @@ def run_ai_pipeline(days_override=None, limit=None, dry_run=False):
             # 2. 텔레그램/이메일 즉각 알림 발송
             notifier.send_telegram(analysis_results)
             notifier.send_email(analysis_results)
+            # 3. 저장·발송까지 끝난 논문만 처리 완료로 기록
+            for res in analysis_results:
+                p = res["paper"]
+                db.mark_as_processed(p.get('id', ''), p.get('doi', ''), p.get('title', ''))
+            logger.info(f"🗂️ 처리 완료 기록: {len(analysis_results)}건")
 
         logger.info("✨ 전체 파이프라인 작업 완료!")
 
