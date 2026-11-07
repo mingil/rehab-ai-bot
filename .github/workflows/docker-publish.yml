@@ -12,6 +12,11 @@ permissions:
   contents: read
   packages: write
 
+# 2026-11-07: 빌드가 겹치면 늦게 끝난 예전 commit 빌드가 latest 를 덮어쓰는 것을 방지 (같은 브랜치는 순서대로 1개씩)
+concurrency:
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test-and-publish:
     name: Run Tests & Publish Docker Image
@@ -65,8 +70,6 @@ jobs:
             docker.io/kimmingil/rehab-ai-bot
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=v2.0.1,enable={{is_default_branch}}
-            type=raw,value=v2.0.0,enable={{is_default_branch}}
             type=sha,prefix=sha-
 
       - name: Extract Docker metadata (GHCR Only fallback)
@@ -78,8 +81,6 @@ jobs:
             ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=v2.0.1,enable={{is_default_branch}}
-            type=raw,value=v2.0.0,enable={{is_default_branch}}
             type=sha,prefix=sha-
 
       - name: Build and push Docker image
