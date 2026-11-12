@@ -2,6 +2,7 @@ import os
 import re
 import time
 import requests
+import jcr_lookup
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -86,6 +87,7 @@ class Notifier:
             md_content = f"""---
 title: "{safe_yaml_title}"
 journal: "{p.get('journal', 'N/A')}"
+jcr: "{jcr_lookup.label(p)}"
 date: "{p.get('date', 'N/A')}"
 pmid: "{pmid}"
 doi: "{p.get('doi', '')}"
@@ -96,7 +98,7 @@ tags:
 
 # 📄 {title}
 
-- **저널:** {p.get('journal', 'N/A')} ({p.get('date', 'N/A')})
+- **저널:** {p.get('journal', 'N/A')} ({p.get('date', 'N/A')}){(" — " + jcr_lookup.label(p)) if jcr_lookup.label(p) else ""}
 - **원문 링크:** [PubMed 보기]({p.get('link', '#')})
 
 ---
@@ -145,7 +147,7 @@ tags:
 
             clean_analysis = self._clean_markdown_for_html(a, is_email=False)
             safe_title = html.escape(p.get('title', '제목 없음'))
-            safe_journal = html.escape(p.get('journal', 'N/A'))
+            safe_journal = html.escape(p.get('journal', 'N/A') + ((" · " + jcr_lookup.label(p)) if jcr_lookup.label(p) else ""))
             safe_date = html.escape(p.get('date', 'N/A'))
             safe_link = html.escape(p.get('link', '#'), quote=True)
 
@@ -208,7 +210,7 @@ tags:
             p = res.get('paper', {})
             a_html = self._clean_markdown_for_html(res.get('analysis', ''), is_email=True)
             safe_title = html.escape(p.get('title', '제목 없음'))
-            safe_journal = html.escape(p.get('journal', 'N/A'))
+            safe_journal = html.escape(p.get('journal', 'N/A') + ((" · " + jcr_lookup.label(p)) if jcr_lookup.label(p) else ""))
             safe_date = html.escape(p.get('date', 'N/A'))
             safe_link = html.escape(p.get('link', '#'), quote=True)
 

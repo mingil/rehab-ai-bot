@@ -6,6 +6,7 @@ import datetime
 from urllib.error import HTTPError, URLError
 import http.client
 from Bio import Entrez
+import jcr_lookup
 
 logger = logging.getLogger("JCBot")
 
@@ -137,8 +138,10 @@ class PubMedFetcher:
 
             # 저널 및 출판일 추출
             journal_data = article_data.get('Journal', {})
+            issn = ""
             if isinstance(journal_data, dict):
                 journal = str(journal_data.get('Title', 'Unknown Journal'))
+                issn = str(journal_data.get('ISSN', '') or '').strip()
                 pub_date = journal_data.get('JournalIssue', {}).get('PubDate', {}) if isinstance(journal_data.get('JournalIssue'), dict) else {}
             else:
                 journal = "Unknown Journal"
@@ -149,9 +152,11 @@ class PubMedFetcher:
             else:
                 date_str = "Unknown Date"
 
+            linking = str((medline.get('MedlineJournalInfo', {}) or {}).get('ISSNLinking', '') or '').strip() if isinstance(medline, dict) else ""
             return {
                 'id': pmid, 'doi': doi, 'title': title, 'abstract': abstract_text,
                 'journal': journal, 'date': date_str, 'authors': authors_str,
+                'issn': issn, 'jcr': jcr_lookup.lookup(",".join(x for x in (issn, linking) if x), journal),
                 'raw_authors': article_data.get('AuthorList', []) if isinstance(article_data.get('AuthorList'), list) else [],
                 'link': f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
             }
